@@ -32,6 +32,31 @@ export async function activate(context: vscode.ExtensionContext) {
   const backend = globalState.extensionBackend;
   const logger = globalState.logger;
 
+  let isReInitializing = false;
+  let reInitializeTimeout: NodeJS.Timeout | undefined;
+  function debounceReInitializeBackend() {
+    if (reInitializeTimeout) {
+      clearTimeout(reInitializeTimeout);
+    }
+    reInitializeTimeout = setTimeout(reInitializeBackend, 250);
+  }
+
+  async function reInitializeBackend() {
+    if (isReInitializing) {
+      debounceReInitializeBackend();
+      return;
+    }
+    isReInitializing = true;
+    try {
+      await backend.reInitialize();
+      logger.logInfo("Extension active!");
+    } catch (err) {
+      logger.logError("Error initializing:", err);
+    } finally {
+      isReInitializing = false;
+    }
+  }
+
   // reinitialize on workspace folder changes
   context.subscriptions.push(vscode.commands.registerCommand("dprint.restart", debounceReInitializeBackend));
   context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(debounceReInitializeBackend));
@@ -78,31 +103,6 @@ export async function activate(context: vscode.ExtensionContext) {
   });
 
   debounceReInitializeBackend();
-
-  let isReInitializing = false;
-  let reInitializeTimeout: NodeJS.Timeout | undefined;
-  function debounceReInitializeBackend() {
-    if (reInitializeTimeout) {
-      clearTimeout(reInitializeTimeout);
-    }
-    reInitializeTimeout = setTimeout(reInitializeBackend, 250);
-  }
-
-  async function reInitializeBackend() {
-    if (isReInitializing) {
-      debounceReInitializeBackend();
-      return;
-    }
-    isReInitializing = true;
-    try {
-      await backend.reInitialize();
-      logger.logInfo("Extension active!");
-    } catch (err) {
-      logger.logError("Error initializing:", err);
-    } finally {
-      isReInitializing = false;
-    }
-  }
 }
 
 // this method is called when your extension is deactivated
