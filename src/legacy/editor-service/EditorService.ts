@@ -1,7 +1,7 @@
 import type * as vscode from "vscode";
 
 export interface EditorService {
-  killAndDispose(): void;
+  killAndDispose(): Promise<void>;
   canFormat(filePath: string): Promise<boolean>;
   formatText(filePath: string, fileText: string, token: vscode.CancellationToken): Promise<string | undefined>;
 }

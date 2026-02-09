@@ -100,7 +100,7 @@ export class EditorService5 implements EditorService {
     }
   }
 
-  killAndDispose() {
+  async killAndDispose() {
     // If graceful shutdown doesn't work soon enough
     // then kill the process
     const killTimeout = setTimeout(() => {
@@ -109,11 +109,15 @@ export class EditorService5 implements EditorService {
     }, 1_000);
 
     // send a graceful shutdown signal
-    this.gracefulClose().finally(() => {
+    try {
+      await this.gracefulClose();
+    } catch {
+      // ignore
+    } finally {
       this._disposed = true;
       this._process.kill();
       clearTimeout(killTimeout);
-    }).catch(() => {/* ignore */});
+    }
   }
 
   canFormat(filePath: string) {

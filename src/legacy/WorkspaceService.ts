@@ -31,8 +31,8 @@ export class WorkspaceService implements vscode.DocumentFormattingEditProvider {
     this.#logger = opts.logger;
   }
 
-  dispose() {
-    this.#clearFolders();
+  async dispose() {
+    await this.#clearFolders();
     this.#disposed = true;
   }
 
@@ -63,17 +63,15 @@ export class WorkspaceService implements vscode.DocumentFormattingEditProvider {
     return bestMatch;
   }
 
-  #clearFolders() {
-    for (const folder of this.#folders) {
-      folder.dispose();
-    }
+  async #clearFolders() {
+    await Promise.all(this.#folders.map(f => f.dispose()));
     this.#folders.length = 0; // clear
   }
 
   async initializeFolders(): Promise<FolderInfos> {
     this.#assertNotDisposed();
 
-    this.#clearFolders();
+    await this.#clearFolders();
     if (vscode.workspace.workspaceFolders == null) {
       return [];
     }

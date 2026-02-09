@@ -42,10 +42,10 @@ export function activateLegacy(
       }
       logger.logDebug("Initialized legacy backend.");
     },
-    dispose() {
+    async dispose() {
       formattingSubscription?.dispose();
       formattingSubscription = undefined;
-      resourceStores.dispose();
+      await resourceStores.disposeAsync();
       logger.logDebug("Disposed legacy backend.");
     },
   };

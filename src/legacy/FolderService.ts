@@ -41,8 +41,8 @@ export class FolderService implements vscode.DocumentFormattingEditProvider {
     return this.#workspaceFolder.uri;
   }
 
-  dispose() {
-    this.#setEditorService(undefined);
+  async dispose() {
+    await this.#setEditorService(undefined);
     this.#disposed = true;
   }
 
@@ -60,7 +60,7 @@ export class FolderService implements vscode.DocumentFormattingEditProvider {
     this.#assertNotDisposed();
     const config = this.#getConfig();
     this.#logger.setDebug(config.verbose);
-    this.#setEditorService(undefined);
+    await this.#setEditorService(undefined);
 
     const dprintExe = await this.#getDprintExecutable();
     const isInstalled = await dprintExe.checkInstalled();
@@ -92,7 +92,7 @@ export class FolderService implements vscode.DocumentFormattingEditProvider {
       return true;
     } catch (err) {
       // clear
-      this.#setEditorService(undefined);
+      await this.#setEditorService(undefined);
       this.#editorInfo = undefined;
 
       if (err instanceof ObjectDisposedError) {
@@ -141,8 +141,8 @@ export class FolderService implements vscode.DocumentFormattingEditProvider {
     }
   }
 
-  #setEditorService(newService: EditorService | undefined) {
-    this.#editorService?.killAndDispose();
+  async #setEditorService(newService: EditorService | undefined) {
+    await this.#editorService?.killAndDispose();
     this.#editorService = newService;
   }
 

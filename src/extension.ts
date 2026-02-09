@@ -33,15 +33,15 @@ export async function activate(context: vscode.ExtensionContext) {
   const logger = globalState.logger;
 
   // reinitialize on workspace folder changes
-  context.subscriptions.push(vscode.commands.registerCommand("dprint.restart", reInitializeBackend));
-  context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(reInitializeBackend));
+  context.subscriptions.push(vscode.commands.registerCommand("dprint.restart", debounceReInitializeBackend));
+  context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(debounceReInitializeBackend));
 
   // reinitialize on configuration file changes
   const fileSystemWatcher = vscode.workspace.createFileSystemWatcher(DPRINT_CONFIG_FILEPATH_GLOB);
   context.subscriptions.push(fileSystemWatcher);
-  context.subscriptions.push(fileSystemWatcher.onDidChange(reInitializeBackend));
-  context.subscriptions.push(fileSystemWatcher.onDidCreate(reInitializeBackend));
-  context.subscriptions.push(fileSystemWatcher.onDidDelete(reInitializeBackend));
+  context.subscriptions.push(fileSystemWatcher.onDidChange(debounceReInitializeBackend));
+  context.subscriptions.push(fileSystemWatcher.onDidCreate(debounceReInitializeBackend));
+  context.subscriptions.push(fileSystemWatcher.onDidDelete(debounceReInitializeBackend));
 
   // reinitialize when the vscode configuration changes
   let hasShownLspWarning = false;
@@ -66,7 +66,7 @@ export async function activate(context: vscode.ExtensionContext) {
         hasShownLspWarning = true;
       } else {
         hasShownLspWarning = false;
-        await reInitializeBackend();
+        debounceReInitializeBackend();
       }
     }
   }));
@@ -77,21 +77,30 @@ export async function activate(context: vscode.ExtensionContext) {
     },
   });
 
-  reInitializeBackend().then(success => {
-    if (success) {
-      logger.logInfo("Extension active!");
-    } else {
-      logger.logWarn("Extension failed to start.");
+  debounceReInitializeBackend();
+
+  let isReInitializing = false;
+  let reInitializeTimeout: NodeJS.Timeout | undefined;
+  function debounceReInitializeBackend() {
+    if (reInitializeTimeout) {
+      clearTimeout(reInitializeTimeout);
     }
-  });
+    reInitializeTimeout = setTimeout(reInitializeBackend, 250);
+  }
 
   async function reInitializeBackend() {
+    if (isReInitializing) {
+      debounceReInitializeBackend();
+      return;
+    }
+    isReInitializing = true;
     try {
       await backend.reInitialize();
-      return true;
+      logger.logInfo("Extension active!");
     } catch (err) {
       logger.logError("Error initializing:", err);
-      return false;
+    } finally {
+      isReInitializing = false;
     }
   }
 }
