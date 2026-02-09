@@ -33,23 +33,9 @@ export async function activate(context: vscode.ExtensionContext) {
   const logger = globalState.logger;
 
   let isReInitializing = false;
-  let pendingReInit = false;
-  let reInitializeTimeout: NodeJS.Timeout | undefined;
-  function debounceReInitializeBackend() {
-    if (reInitializeTimeout) {
-      clearTimeout(reInitializeTimeout);
-    }
-    if (isReInitializing) {
-      // Don't queue more reinits; just mark that one is needed after the current finishes.
-      pendingReInit = true;
-      return;
-    }
-    reInitializeTimeout = setTimeout(reInitializeBackend, 250);
-  }
 
   async function reInitializeBackend() {
     if (isReInitializing) {
-      pendingReInit = true;
       return;
     }
     isReInitializing = true;
@@ -60,35 +46,50 @@ export async function activate(context: vscode.ExtensionContext) {
       logger.logError("Error initializing:", err);
     } finally {
       isReInitializing = false;
-      // If a reinit was requested while we were busy, do ONE more.
-      if (pendingReInit) {
-        pendingReInit = false;
-        debounceReInitializeBackend();
-      }
     }
   }
 
-  // reinitialize on workspace folder changes
-  context.subscriptions.push(vscode.commands.registerCommand("dprint.restart", debounceReInitializeBackend));
-  context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(debounceReInitializeBackend));
+  // Prompt the user to restart when a dprint config file changes,
+  // rather than auto-restarting (which races with dprint's own
+  // config file modifications during startup).
+  let configChangePromptVisible = false;
+  function promptReInitializeBackend() {
+    if (configChangePromptVisible) {
+      return; // Don't stack multiple prompts
+    }
+    configChangePromptVisible = true;
+    const action = "Refresh";
+    vscode.window.showInformationMessage(
+      "Dprint configuration changed. Refresh plugin to apply?",
+      action,
+    ).then(selectedAction => {
+      configChangePromptVisible = false;
+      if (selectedAction === action) {
+        reInitializeBackend();
+      }
+    });
+  }
 
-  // reinitialize on configuration file changes
+  // reinitialize on workspace folder changes
+  context.subscriptions.push(
+    vscode.commands.registerCommand("dprint.restart", reInitializeBackend),
+  );
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(reInitializeBackend),
+  );
+
+  // prompt to reinitialize on configuration file changes
   const fileSystemWatcher = vscode.workspace.createFileSystemWatcher(DPRINT_CONFIG_FILEPATH_GLOB);
   context.subscriptions.push(fileSystemWatcher);
-  context.subscriptions.push(fileSystemWatcher.onDidChange(debounceReInitializeBackend));
-  context.subscriptions.push(fileSystemWatcher.onDidCreate(debounceReInitializeBackend));
-  context.subscriptions.push(fileSystemWatcher.onDidDelete(debounceReInitializeBackend));
+  context.subscriptions.push(fileSystemWatcher.onDidChange(promptReInitializeBackend));
+  context.subscriptions.push(fileSystemWatcher.onDidCreate(promptReInitializeBackend));
+  context.subscriptions.push(fileSystemWatcher.onDidDelete(promptReInitializeBackend));
 
   // reinitialize when the vscode configuration changes
   let hasShownLspWarning = false;
   context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async evt => {
     if (evt.affectsConfiguration("dprint")) {
       if (isLsp() !== backend?.isLsp && !hasShownLspWarning) {
-        // I tried really hard to not have to reload, but having everything clean up
-        // properly was a pain and I think there might be stuff going on in the
-        // vscode-languageclient that I don't know about. So, just prompt the user
-        // to reload the vscode window when they change this option.
-        // https://stackoverflow.com/a/47189404/188246
         const action = "Reload";
         vscode.window.showInformationMessage(
           "Changing dprint.experimentalLsp requires reloading the vscode window.",
@@ -102,7 +103,7 @@ export async function activate(context: vscode.ExtensionContext) {
         hasShownLspWarning = true;
       } else {
         hasShownLspWarning = false;
-        debounceReInitializeBackend();
+        promptReInitializeBackend();
       }
     }
   }));
@@ -113,7 +114,7 @@ export async function activate(context: vscode.ExtensionContext) {
     },
   });
 
-  debounceReInitializeBackend();
+  reInitializeBackend();
 }
 
 // this method is called when your extension is deactivated
