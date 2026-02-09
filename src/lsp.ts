@@ -19,8 +19,11 @@ export function activateLsp(
   return {
     isLsp: true,
     async reInitialize() {
-      await client?.stop(2_000);
-      client = undefined;
+      if (client) {
+        await client.stop(2_000);
+        client.dispose();
+        client = undefined;
+      }
       if (!(await workspaceHasConfigFile())) {
         logger.logInfo("Configuration file not found.");
         return;
@@ -58,13 +61,16 @@ export function activateLsp(
         serverOptions,
         clientOptions,
       );
-      resourceStores.push(client);
       await client.start();
       logger.logInfo("Started experimental language server.");
     },
     async dispose() {
+      if (client) {
+        await client.stop(2_000);
+        client.dispose();
+        client = undefined;
+      }
       resourceStores.dispose();
-      client = undefined;
     },
   };
 

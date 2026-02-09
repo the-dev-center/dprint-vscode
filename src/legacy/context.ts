@@ -11,6 +11,7 @@ export function activateLegacy(
   approvedPaths: ApprovedConfigPaths,
 ): ExtensionBackend {
   const resourceStores = new ActivatedDisposables(logger);
+  let formattingSubscription: vscode.Disposable | undefined;
   const workspaceService = new WorkspaceService({
     approvedPaths,
     logger,
@@ -42,27 +43,30 @@ export function activateLegacy(
       logger.logDebug("Initialized legacy backend.");
     },
     dispose() {
+      formattingSubscription?.dispose();
+      formattingSubscription = undefined;
       resourceStores.dispose();
       logger.logDebug("Disposed legacy backend.");
     },
   };
 
   function trySetFormattingSubscriptionFromFolderInfos(allFolderInfos: FolderInfos) {
+    formattingSubscription?.dispose();
+    formattingSubscription = undefined;
+
     const formattingPatterns = getFormattingPatterns();
 
     if (formattingPatterns.length === 0) {
       return;
     }
 
-    resourceStores.push(
-      vscode.languages.registerDocumentFormattingEditProvider(
-        formattingPatterns.map(pattern => ({ scheme: "file", pattern })),
-        {
-          provideDocumentFormattingEdits(document, options, token) {
-            return workspaceService.provideDocumentFormattingEdits(document, options, token);
-          },
+    formattingSubscription = vscode.languages.registerDocumentFormattingEditProvider(
+      formattingPatterns.map(pattern => ({ scheme: "file", pattern })),
+      {
+        provideDocumentFormattingEdits(document, options, token) {
+          return workspaceService.provideDocumentFormattingEdits(document, options, token);
         },
-      ),
+      },
     );
 
     function getFormattingPatterns() {
