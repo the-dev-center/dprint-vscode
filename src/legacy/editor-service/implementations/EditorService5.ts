@@ -101,10 +101,13 @@ export class EditorService5 implements EditorService {
   }
 
   async killAndDispose() {
+    // Set disposed FIRST to prevent startReadingStdout from restarting
+    // the process when it detects the exit during graceful shutdown.
+    this._disposed = true;
+
     // If graceful shutdown doesn't work soon enough
     // then kill the process
     const killTimeout = setTimeout(() => {
-      this._disposed = true;
       this._process.kill();
     }, 1_000);
 
@@ -114,7 +117,6 @@ export class EditorService5 implements EditorService {
     } catch {
       // ignore
     } finally {
-      this._disposed = true;
       this._process.kill();
       clearTimeout(killTimeout);
     }

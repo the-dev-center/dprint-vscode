@@ -33,17 +33,23 @@ export async function activate(context: vscode.ExtensionContext) {
   const logger = globalState.logger;
 
   let isReInitializing = false;
+  let pendingReInit = false;
   let reInitializeTimeout: NodeJS.Timeout | undefined;
   function debounceReInitializeBackend() {
     if (reInitializeTimeout) {
       clearTimeout(reInitializeTimeout);
+    }
+    if (isReInitializing) {
+      // Don't queue more reinits; just mark that one is needed after the current finishes.
+      pendingReInit = true;
+      return;
     }
     reInitializeTimeout = setTimeout(reInitializeBackend, 250);
   }
 
   async function reInitializeBackend() {
     if (isReInitializing) {
-      debounceReInitializeBackend();
+      pendingReInit = true;
       return;
     }
     isReInitializing = true;
@@ -54,6 +60,11 @@ export async function activate(context: vscode.ExtensionContext) {
       logger.logError("Error initializing:", err);
     } finally {
       isReInitializing = false;
+      // If a reinit was requested while we were busy, do ONE more.
+      if (pendingReInit) {
+        pendingReInit = false;
+        debounceReInitializeBackend();
+      }
     }
   }
 
