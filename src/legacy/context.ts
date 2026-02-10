@@ -83,6 +83,15 @@ export function activateLegacy(
           patterns.push(pattern);
         }
       }
+
+      // If no folders were initialized with a config file, register for all workspace folders
+      // to provide a better error message when formatting is triggered.
+      if (patterns.length === 0 && vscode.workspace.workspaceFolders != null) {
+        for (const folder of vscode.workspace.workspaceFolders) {
+          patterns.push(new vscode.RelativePattern(folder.uri, `**/*`));
+        }
+      }
+
       return patterns;
     }
   }

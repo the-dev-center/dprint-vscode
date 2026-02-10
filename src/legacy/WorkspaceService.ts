@@ -48,7 +48,15 @@ export class WorkspaceService implements vscode.DocumentFormattingEditProvider {
     token: vscode.CancellationToken,
   ) {
     const folder = this.#getFolderForUri(document.uri);
-    return folder?.provideDocumentFormattingEdits(document, options, token);
+    if (!folder) {
+      if (this.#folders.length === 0) {
+        vscode.window.showErrorMessage(
+          "dprint: No configuration file found. Run 'dprint init' or check your project root to enable formatting.",
+        );
+      }
+      return [];
+    }
+    return folder.provideDocumentFormattingEdits(document, options, token);
   }
 
   #getFolderForUri(uri: vscode.Uri) {
