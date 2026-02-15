@@ -136,6 +136,30 @@ export class WorkspaceService implements vscode.DocumentFormattingEditProvider {
         }
       }
     }
+    // add a global fallback folder
+    const rootParams = {
+        uri: vscode.Uri.file(process.platform === "win32" ? "C:\\" : "/"),
+        name: "Global",
+        index: -1
+    } as vscode.WorkspaceFolder;
+    const globalFolderService = new FolderService({
+        approvedPaths: this.#approvedPaths,
+        workspaceFolder: rootParams,
+        configUri: undefined,
+        logger: this.#logger,
+    });
+    if (await globalFolderService.initialize()) {
+        const editorInfo = globalFolderService.getEditorInfo();
+        if (editorInfo != null) {
+            allEditorInfos.push({ uri: globalFolderService.uri, editorInfo });
+            this.#folders.push(globalFolderService);
+        } else {
+            globalFolderService.dispose();
+        }
+    } else {
+        globalFolderService.dispose();
+    }
+
     return allEditorInfos;
   }
 }
